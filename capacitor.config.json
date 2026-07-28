@@ -1,0 +1,13 @@
+{
+  "appId": "com.capmaster2023.admincalculator",
+  "appName": "calendrier-nueve",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

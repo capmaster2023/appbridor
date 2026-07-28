@@ -1,0 +1,107 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title><style>body{margin:0;background:#0b0d12;color:#eef2f8;font-family:system-ui}.top{display:flex;gap:10px;align-items:center;padding:18px;background:#111722;position:sticky;top:0;z-index:2}.top b{flex:1}button,input,select,textarea{border:0;border-radius:12px;padding:12px;font:inherit}input,select,textarea{max-width:100%;background:#0d1220;color:#eef2f8;border:1px solid rgba(255,255,255,.12)}textarea{min-height:120px;resize:vertical}.gold{background:#c9a24b;color:#1a1407;font-weight:800}.ghost{background:#262d3c;color:white}.danger{background:#5b2525;color:#ffd0d0}.wrap{padding:16px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.card{background:#151b28;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:14px;margin:10px 0}.num{font-size:26px;font-weight:900}.muted{color:#9aa3b5;font-size:13px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lic{word-break:break-all}.full{width:100%;box-sizing:border-box;margin-top:8px}.ok{color:#9dffbf}.err{color:#ffb0b0}a{color:#e2c074}.small{font-size:12px}.pill{display:inline-block;border:1px solid rgba(255,255,255,.15);border-radius:99px;padding:5px 8px;margin:3px;color:#cbd4e5}.bar{height:12px;border-radius:99px;background:#0d1220;border:1px solid rgba(255,255,255,.12);overflow:hidden;margin:10px 0}.fill{height:100%;width:0;background:#c9a24b;transition:width .4s}.logtable{display:flex;flex-direction:column;gap:6px;margin:6px 0}.logrow{display:grid;grid-template-columns:1.3fr 1.1fr .9fr 1.6fr;gap:8px;font-size:12px;background:#0f1522;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px}.logrow span{word-break:break-word}</style></head><body><div class="top"><button class="ghost" onclick="location.href='home.html'">‹</button><b>Administration</b><button class="danger" onclick="lockAdminNow()">Verrouiller</button></div><div class="wrap"><div id="integrity" class="card">Contrôle intégrité…</div><div id="stats" class="grid"></div>
+
+<div class="card"><b>Créer licences</b><p class="muted">Maximum 50 licences en une opération. Le générateur n’utilise jamais ton nom, prénom ou initiales.</p><div class="row"><select id="count"><option>1</option><option>5</option><option>10</option><option>20</option><option>50</option></select><select id="licFormat"><option value="XXXX-XXXX-XXXX-XXXX">XXXX-XXXX-XXXX-XXXX</option><option value="XXXXXXXX-XXXXXXXX">XXXXXXXX-XXXXXXXX</option></select><button class="gold" onclick="makeBatch()">Générer</button><button class="ghost" onclick="exportCSV()">Export CSV</button><button class="ghost" onclick="exportTXT()">Export TXT</button></div></div>
+
+<div class="card"><b>Intégration Claude Opus 4.8</b><p class="muted">La clé Anthropic vit uniquement dans <b>GitHub Secrets</b> (<code>ANTHROPIC_API_KEY</code>). L’application n’appelle jamais api.anthropic.com directement et ne stocke jamais la clé. Le test réel passe par GitHub Actions. Claude modifie seulement la copie temporaire destinée aux APK clients ; l’app admin reste la source de référence.</p><div class="row"><select id="claudeModel"><option value="claude-opus-4-8" selected>claude-opus-4-8 (défaut)</option><option value="claude-sonnet-4-6">claude-sonnet-4-6</option><option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001</option></select><button class="ghost" onclick="saveClaude()">Sauver modèle</button><button class="gold" onclick="testClaude()">Tester la connexion</button></div><div id="claudeStatus" class="muted"></div></div>
+
+<div class="card"><b>Modifier une version client</b><p class="muted">Écris ici ce que Claude doit changer dans les APK clients générées: interface, couleurs, options ou fonctions client. Le code admin, GitHub, Claude et génération est exclu de la compilation client.</p><textarea id="clientPrompt" class="full" placeholder="Exemple : change les couleurs du client 01, ajoute une option, supprime un élément visible côté client..."></textarea><div class="row"><button class="ghost" onclick="saveClientPrompt()">Sauver la demande</button><button class="gold" onclick="buildClientApks()">Générer + modifier avec Claude + compiler</button></div></div>
+
+<div class="card"><b>GitHub</b><p class="muted">Les compilations clients sont lancées via GitHub Actions en parallèle. Chaque APK reçoit une licence, une configuration et une identité unique.</p><input id="ghToken" class="full" type="password" placeholder="GitHub Personal Access Token"><div class="row"><input id="ghOwner" placeholder="owner"><input id="ghRepo" placeholder="Nom du dépôt"><input id="ghBranch" placeholder="Branche principale"></div><input id="ghUrl" class="full" placeholder="URL GitHub"><label class="muted full" style="display:block">Nombre d’APK à compiler (1–50)</label><input id="apkCount" class="full" type="number" min="1" max="50" step="1" value="1" oninput="saveApkCount()"><div class="row"><button class="ghost" onclick="saveGithub()">Sauver GitHub</button><button class="gold" onclick="testGithub()">Tester GitHub</button><button class="gold" onclick="buildClientApks()">Générer licences + compiler APK clients</button></div><div id="buildStatus" class="muted"></div><div id="buildProgress" class="card" style="display:none;margin-top:12px"><div class="num">Compilation <span id="bpDone">0</span> / <span id="bpTotal">0</span></div><div class="muted">Compilés: <span id="bpCompiled">0</span> · Restants: <span id="bpRemaining">0</span> · État GitHub Actions: <span id="bpState">—</span></div><div class="bar"><div id="bpFill" class="fill"></div></div><div class="row"><button class="danger" onclick="cancelBuild()">Annuler compilation</button><a id="bpLink" href="#" style="display:none">Ouvrir GitHub Actions</a></div></div></div>
+
+<div class="card"><b>Historique Claude</b><p class="muted">Journal: date, heure, modèle, résultat, erreur éventuelle.</p><div class="row"><button class="ghost" onclick="renderHistories()">Actualiser</button><button class="danger" onclick="clearClaudeHistory()">Vider</button></div><div id="claudeHistory" class="muted"></div></div>
+
+<div class="card"><input id="search" class="full" placeholder="Rechercher licence" oninput="render()"></div><div id="list"></div><div class="card"><b>Validation client obligatoire</b><p class="muted">Le workflow vérifie que les APK clients ne contiennent aucun panneau admin, écran admin, gestionnaire GitHub, gestionnaire Claude ou système de génération. Les protections Android existantes restent appliquées par les scripts du projet.</p><span class="pill">R8</span><span class="pill">ProGuard</span><span class="pill">Obfuscation</span><span class="pill">Root</span><span class="pill">Frida</span><span class="pill">Xposed</span><span class="pill">Magisk</span><span class="pill">Émulateur</span></div></div>
+<script src="app-logger.js"></script><script src="commercial-core.js"></script><script>
+const ADMIN_TIMEOUT_MS=5*60*1000;
+const ADMIN_ACTIVE_KEY='admin_session_active_v1';
+const ADMIN_LAST_KEY='admin_last_activity_v1';
+let adminTimeoutTimer=null;
+function adminNow(){return Date.now()}
+function adminLastActivity(){const n=parseInt(localStorage.getItem(ADMIN_LAST_KEY)||'0',10);return Number.isFinite(n)?n:0}
+function adminSessionValid(){return sessionStorage.getItem('admin_unlocked')==='1'||(localStorage.getItem(ADMIN_ACTIVE_KEY)==='1'&&(adminNow()-adminLastActivity())<ADMIN_TIMEOUT_MS)}
+function touchAdminActivity(){try{sessionStorage.setItem('admin_unlocked','1');localStorage.setItem(ADMIN_ACTIVE_KEY,'1');localStorage.setItem(ADMIN_LAST_KEY,String(adminNow()));scheduleAdminTimeout()}catch(e){}}
+function clearAdminSession(){try{sessionStorage.removeItem('admin_unlocked');localStorage.removeItem(ADMIN_ACTIVE_KEY);localStorage.removeItem(ADMIN_LAST_KEY)}catch(e){}}
+function lockAdminNow(){clearAdminSession();location.replace('index.html')}
+function expireAdminIfNeeded(){const remaining=ADMIN_TIMEOUT_MS-(adminNow()-adminLastActivity());if(remaining<=0){lockAdminNow();return true}scheduleAdminTimeout(remaining);return false}
+function scheduleAdminTimeout(delay){clearTimeout(adminTimeoutTimer);const remaining=typeof delay==='number'?delay:Math.max(0,ADMIN_TIMEOUT_MS-(adminNow()-adminLastActivity()));adminTimeoutTimer=setTimeout(expireAdminIfNeeded,remaining+250)}
+if(!adminSessionValid()){try{location.replace('index.html')}catch(e){}}else{touchAdminActivity();['pointerdown','keydown','touchstart','click','input','change','scroll'].forEach(ev=>document.addEventListener(ev,touchAdminActivity,{passive:true,capture:true}));document.addEventListener('visibilitychange',()=>{if(!document.hidden)expireAdminIfNeeded()});window.addEventListener('pageshow',expireAdminIfNeeded);window.addEventListener('beforeunload',()=>{localStorage.setItem(ADMIN_LAST_KEY,String(adminNow()))});}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let BUILD={runId:null,cancel:false};
+async function init(){const r=await CommercialCore.localIntegrity();integrity.innerHTML='<b>Intégrité</b><div class="muted">'+r.message+'</div>';const g=CommercialCore.githubCfg();ghOwner.value=g.owner||'';ghRepo.value=g.repo||'';ghBranch.value=g.branch||'main';ghUrl.value=g.url||'';ghToken.value=g.token||'';const c=CommercialCore.claudeCfg();claudeModel.value=c.model||'claude-opus-4-8';apkCount.value=localStorage.getItem('zak_apk_count_v1')||'1';clientPrompt.value=localStorage.getItem('zak_client_mod_prompt_v1')||'';render();renderHistories()}
+function L(){return CommercialCore.licenseStore()}
+function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function clampApk(){let n=parseInt(apkCount.value,10);if(isNaN(n))n=1;n=Math.max(1,Math.min(50,n));return n}
+function saveApkCount(){const n=clampApk();localStorage.setItem('zak_apk_count_v1',String(n))}
+function render(){const l=L(),q=(search?.value||'').toLowerCase();const active=l.filter(x=>x.status==='active').length,rev=l.filter(x=>x.status==='revoked').length,exp=l.filter(x=>x.status==='expired').length;stats.innerHTML=[['Total',l.length],['Actives',active],['Révoquées',rev],['Expirées',exp],['Appareils',new Set(l.map(x=>x.deviceId).filter(Boolean)).size],['Dernières',l.slice(0,5).length]].map(x=>'<div class="card"><div class="num">'+x[1]+'</div><div class="muted">'+x[0]+'</div></div>').join('');list.innerHTML=l.filter(x=>JSON.stringify(x).toLowerCase().includes(q)).map(x=>'<div class="card"><b class="lic">'+esc(x.id)+'</b><div class="muted">Config: '+esc(x.configId||'—')+'<br>Statut: '+esc(x.status)+' · Créée: '+esc(x.createdAt)+'<br>Activée: '+esc(x.activatedAt||'—')+' · Dernière vérification: '+esc(x.lastCheck||'—')+'<br>Appareil: '+esc(x.deviceId||'—')+' · Version: '+esc(x.appVersion)+'</div><div class="row"><button class="ghost" onclick="CommercialCore.update(\''+x.id+'\',{status:\'active\'});render()">Activer</button><button class="danger" onclick="CommercialCore.update(\''+x.id+'\',{status:\'revoked\'});render()">Révoquer</button><button class="ghost" onclick="CommercialCore.update(\''+x.id+'\',{deviceId:null,activatedAt:null,status:\'inactive\'});render()">Reset appareil</button><button class="danger" onclick="CommercialCore.saveLicenses(L().filter(y=>y.id!==\''+x.id+'\'));CommercialCore.log(\'LICENSE_DELETED\',{id:\''+x.id+'\'});render()">Supprimer</button></div></div>').join('')||'<div class="muted">Aucune licence</div>'}
+function makeBatch(){CommercialCore.batch(count.value,licFormat.value);render()}
+function dl(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));a.download=name;a.click()}
+function exportCSV(){const h='id,customer,configId,createdAt,activatedAt,lastCheck,deviceId,appVersion,status\n';dl('licences.csv',h+L().map(x=>[x.id,x.customer,x.configId||'',x.createdAt,x.activatedAt||'',x.lastCheck||'',x.deviceId||'',x.appVersion,x.status].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'))}
+function exportTXT(){dl('licences.txt',L().map(x=>x.id+' | '+x.status+' | '+(x.configId||'')).join('\n'))}
+function saveGithub(){CommercialCore.saveGithubCfg({token:ghToken.value.trim(),owner:ghOwner.value.trim(),repo:ghRepo.value.trim(),branch:ghBranch.value.trim()||'main',url:ghUrl.value.trim(),workflow:'client-apk-batch.yml'});buildStatus.innerHTML='<span class="ok">GitHub sauvegardé.</span>'}
+function saveClaude(){CommercialCore.saveClaudeCfg({model:claudeModel.value||'claude-opus-4-8'});claudeStatus.innerHTML='<span class="ok">Modèle sauvegardé ('+esc(claudeModel.value)+').</span>'}
+function saveClientPrompt(){localStorage.setItem('zak_client_mod_prompt_v1',clientPrompt.value||'');CommercialCore.addClaudeRequest(clientPrompt.value,claudeModel.value);renderHistories();claudeStatus.innerHTML='<span class="ok">Demande sauvegardée.</span>'}
+async function testGithub(){try{saveGithub();const g=CommercialCore.githubCfg();const res=await fetch('https://api.github.com/repos/'+encodeURIComponent(g.owner)+'/'+encodeURIComponent(g.repo),{headers:{Authorization:'Bearer '+g.token,'Accept':'application/vnd.github+json'}});if(!res.ok)throw new Error('GitHub '+res.status+' '+await res.text());buildStatus.innerHTML='<span class="ok">Connexion GitHub OK.</span>'}catch(e){buildStatus.innerHTML='<span class="err">Erreur GitHub: '+esc(e.message||e)+'</span>'}}
+async function testClaude(){
+  try{
+    saveGithub();saveClaude();
+    claudeStatus.innerHTML='Vérification du secret ANTHROPIC_API_KEY…';
+    let sec;try{sec=await CommercialCore.checkAnthropicSecret()}catch(e){claudeStatus.innerHTML='<span class="err">'+esc(e.message||e)+'</span>';return}
+    if(sec.checkable&&!sec.present){const msg='Secret ANTHROPIC_API_KEY absent dans GitHub (Settings → Secrets and variables → Actions).';CommercialCore.addClaudeLog({model:claudeModel.value,result:'Échec',error:msg,type:'test'});claudeStatus.innerHTML='<span class="err">'+esc(msg)+'</span>';renderHistories();return}
+    claudeStatus.innerHTML='Test réel lancé via GitHub Actions…';
+    const d=await CommercialCore.dispatchClaudeTest(claudeModel.value);
+    const deadline=Date.now()+200000;let res=null;
+    while(Date.now()<deadline){await sleep(5000);try{res=await CommercialCore.fetchClaudeTestResult(d.runToken)}catch(e){}if(res)break;claudeStatus.innerHTML='Test en cours via GitHub Actions… <a href="'+d.actionsUrl+'">Voir</a>'}
+    if(!res){const msg='Délai dépassé. Vérifie l’exécution dans GitHub Actions.';CommercialCore.addClaudeLog({model:claudeModel.value,result:'Échec',error:msg,type:'test'});claudeStatus.innerHTML='<span class="err">'+esc(msg)+'</span> <a href="'+d.actionsUrl+'">Actions</a>';renderHistories();return}
+    CommercialCore.addClaudeLog({model:res.model||claudeModel.value,result:res.ok?'Connexion réussie':'Échec',error:res.error||'',type:'test'});
+    claudeStatus.innerHTML=res.ok?('<span class="ok">Connexion réussie ('+esc(res.model||claudeModel.value)+').</span>'):('<span class="err">'+esc(res.error||'Échec')+'</span>');
+    renderHistories();
+  }catch(e){claudeStatus.innerHTML='<span class="err">Erreur: '+esc(e.message||e)+'</span>'}
+}
+async function buildClientApks(){
+  try{
+    saveGithub();saveClaude();saveApkCount();localStorage.setItem('zak_client_mod_prompt_v1',clientPrompt.value||'');
+    const n=clampApk();apkCount.value=n;
+    const batch=CommercialCore.batch(n,licFormat.value);render();
+    buildStatus.textContent='Génération de '+n+' licence(s) et envoi à GitHub Actions…';
+    const r=await CommercialCore.dispatchGithubBuild(batch,{prompt:clientPrompt.value||''});
+    CommercialCore.addClaudeLog({model:claudeModel.value,result:'Compilation lancée ('+n+' APK)',error:'',type:'build'});renderHistories();
+    buildStatus.innerHTML='<span class="ok">Compilation lancée ('+n+' APK).</span> <a href="'+r.actionsUrl+'">Ouvrir Actions</a>';
+    await trackBuild(n,r.since,r.actionsUrl);
+  }catch(e){buildStatus.innerHTML='<span class="err">Erreur: '+esc(e.message||e)+'</span>'}
+}
+async function trackBuild(total,since,actionsUrl){
+  BUILD.cancel=false;BUILD.runId=null;
+  buildProgress.style.display='';bpTotal.textContent=total;bpDone.textContent='0';bpCompiled.textContent='0';bpRemaining.textContent=total;bpState.textContent='recherche du run…';bpFill.style.width='0%';bpLink.href=actionsUrl;bpLink.style.display='';
+  const wf=CommercialCore.githubCfg().workflow||'client-apk-batch.yml';
+  for(let i=0;i<15&&!BUILD.runId&&!BUILD.cancel;i++){await sleep(4000);try{const run=await CommercialCore.findRecentRun(wf,since);if(run){BUILD.runId=run.id;if(run.html_url)bpLink.href=run.html_url}}catch(e){}}
+  if(!BUILD.runId){bpState.textContent='run introuvable (voir Actions)';return}
+  while(!BUILD.cancel){
+    let run,jobs;
+    try{run=await CommercialCore.getRun(BUILD.runId);jobs=await CommercialCore.getRunJobs(BUILD.runId)}catch(e){await sleep(6000);continue}
+    const buildJobs=jobs.filter(j=>/^build(\s|\(|$)/.test(j.name));
+    const known=buildJobs.length;
+    const shownTotal=Math.max(total,known);
+    const done=buildJobs.filter(j=>j.status==='completed').length;
+    const compiled=buildJobs.filter(j=>j.conclusion==='success').length;
+    bpDone.textContent=done;bpTotal.textContent=shownTotal;bpCompiled.textContent=compiled;bpRemaining.textContent=Math.max(0,shownTotal-done);
+    bpState.textContent=run.status+(run.conclusion?(' · '+run.conclusion):'');
+    bpFill.style.width=(shownTotal?Math.round(done/shownTotal*100):0)+'%';
+    if(run.status==='completed'){
+      const ok=run.conclusion==='success';
+      buildStatus.innerHTML=ok?'<span class="ok">Compilation terminée. Télécharge clients.zip (artifact « client-apk-zip »).</span> <a href="'+bpLink.href+'">Actions</a>':'<span class="err">Compilation terminée: '+esc(run.conclusion||'?')+'. Vérifie Actions.</span> <a href="'+bpLink.href+'">Actions</a>';
+      CommercialCore.addClaudeLog({model:claudeModel.value,result:'Compilation '+(run.conclusion||''),error:ok?'':'voir Actions',type:'build'});renderHistories();
+      break;
+    }
+    await sleep(6000);
+  }
+  if(BUILD.cancel)bpState.textContent='annulée';
+}
+function cancelBuild(){BUILD.cancel=true;if(BUILD.runId){CommercialCore.cancelRun(BUILD.runId).then(ok=>{buildStatus.innerHTML=ok?'<span class="err">Compilation annulée.</span>':'<span class="err">Annulation envoyée (vérifie Actions).</span>'})}else{buildStatus.innerHTML='<span class="err">Annulation demandée avant le démarrage du run.</span>'}}
+function renderHistories(){
+  const lg=CommercialCore.claudeLog?CommercialCore.claudeLog():[];const req=CommercialCore.claudeRequests(),mods=CommercialCore.claudeMods();
+  const logHtml=lg.length?('<div class="logtable"><div class="logrow"><span><b>Date / Heure</b></span><span><b>Modèle</b></span><span><b>Résultat</b></span><span><b>Erreur</b></span></div>'+lg.slice(0,40).map(x=>'<div class="logrow"><span>'+esc(x.date)+' '+esc(x.time)+'</span><span>'+esc(x.model)+'</span><span class="'+(/réussie|terminée|success|lancée/i.test(x.result)?'ok':(x.error?'err':''))+'">'+esc(x.result)+'</span><span class="err">'+esc(x.error||'')+'</span></div>').join('')+'</div>'):'<p>Aucune entrée.</p>';
+  claudeHistory.innerHTML='<b>Journal connexion / compilation</b>'+logHtml+'<b>Demandes envoyées</b>'+(req.length?req.slice(0,10).map(x=>'<div class="card small"><b>'+esc(x.model)+'</b> · '+esc(x.date)+'<br>'+esc(x.prompt).slice(0,600)+'</div>').join(''):'<p>Aucune demande.</p>')+'<b>Modifications générées</b>'+(mods.length?mods.slice(0,10).map(x=>'<div class="card small"><b>'+esc(x.status||x.summary||'Modification')+'</b> · '+esc(x.date)+'<br>'+esc(x.prompt||'').slice(0,400)+'</div>').join(''):'<p>Aucune modification.</p>');
+}
+function clearClaudeHistory(){CommercialCore.saveClaudeRequests([]);CommercialCore.saveClaudeMods([]);if(CommercialCore.clearClaudeLog)CommercialCore.clearClaudeLog();renderHistories()}
+init()
+</script></body></html>

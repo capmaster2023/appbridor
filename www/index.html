@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>Calendrier</title>
+<style>
+:root{
+  --bg0:#0a0e1a;--bg1:#0e1426;--card:rgba(22,28,46,.72);--cardSolid:#161c2e;
+  --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+  --text:#eef2fb;--muted:#8b95ad;--faint:#5b6480;
+  --accent:#6d8bff;--accent2:#9b6bff;--glow:rgba(109,139,255,.45);
+  --nuit:#8b7bff;--soir:#ff9d5c;--jour:#3fd0c9;--quart:#5b9bff;
+  --vacances:#3fcf7a;--ferie:#ffce4f;--conge:#7c89a6;--autre:#9aa3bd;
+  --shadow:0 24px 60px rgba(0,0,0,.5);
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;width:100%;overflow:hidden;background:var(--bg0);color:var(--text);font-family:var(--sans)}
+button,input{font:inherit;color:inherit}
+body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(70px);opacity:.5;z-index:0;pointer-events:none;animation:float 18s ease-in-out infinite}
+body::before{width:60vw;height:60vw;top:-18vw;left:-14vw;background:radial-gradient(circle,#3a4fb0,transparent 65%)}
+body::after{width:55vw;height:55vw;bottom:-20vw;right:-16vw;background:radial-gradient(circle,#6a3fb0,transparent 65%);animation-delay:-9s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(4vw,5vw) scale(1.08)}}
+.screen{position:relative;z-index:1;height:100dvh;height:100vh;display:flex;flex-direction:column;
+  padding:max(12px,env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));gap:10px}
+.glass{background:var(--card);border:1px solid var(--line);border-radius:24px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:var(--shadow)}
+.top{padding:14px 16px}
+.titleRow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.title{font-size:24px;font-weight:800;letter-spacing:-.4px;line-height:1.1;background:linear-gradient(120deg,#fff,#b9c6ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:var(--muted);font-size:12.5px;margin-top:3px;font-weight:600}
+.nav{display:flex;gap:6px}
+.iconBtn{width:38px;height:38px;border:1px solid var(--line2);background:rgba(255,255,255,.04);border-radius:12px;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;transition:transform .12s,background .2s}
+.iconBtn:active{transform:scale(.9);background:rgba(255,255,255,.12)}
+.searchWrap{position:relative;margin-top:13px}
+.searchWrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.55}
+.search{width:100%;height:46px;border:1px solid var(--line2);background:rgba(255,255,255,.05);border-radius:15px;padding:0 14px 0 42px;outline:none;font-size:15px;font-weight:500;transition:border .2s,box-shadow .2s}
+.search::placeholder{color:var(--faint)}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--glow)}
+.seg{display:flex;gap:6px;margin-top:11px;background:rgba(255,255,255,.04);padding:4px;border-radius:14px;border:1px solid var(--line)}
+.seg button{flex:1;height:34px;border:0;background:transparent;color:var(--muted);border-radius:10px;font-size:13px;font-weight:700;transition:.2s}
+.seg button.on{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 18px var(--glow)}
+.calendar{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:6px}
+.week{display:grid;grid-template-columns:repeat(7,1fr)}
+.week div{text-align:center;color:var(--faint);font-weight:800;font-size:11px;padding:8px 0;letter-spacing:.5px}
+.monthGrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:4px;padding:2px}
+.day{position:relative;border:1px solid transparent;background:rgba(255,255,255,.025);border-radius:13px;padding:5px 4px;display:flex;flex-direction:column;gap:3px;overflow:hidden;text-align:left;transition:transform .1s,background .2s}
+.day:active{transform:scale(.94)}
+.day.out{opacity:.32}
+.day.sel{border-color:var(--accent);background:rgba(109,139,255,.12)}
+.num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--text)}
+.day.today .num{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 12px var(--glow)}
+.chips{display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.chip{font-size:9.5px;font-weight:700;line-height:1.2;padding:2px 5px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0a0e1a}
+.more{font-size:9px;color:var(--muted);font-weight:700;padding-left:3px}
+.dotRow{display:flex;gap:3px;flex-wrap:wrap}
+.d{width:6px;height:6px;border-radius:50%}
+.yearGrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:8px}
+.decGrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:8px}
+.mTile{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:16px;padding:12px;min-height:84px;text-align:left;transition:transform .1s}
+.mTile:active{transform:scale(.96)}
+.mTile b{display:block;font-size:14px;margin-bottom:8px}
+.yTile{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:16px;padding:16px 8px;font-weight:800;font-size:16px;text-align:center;transition:transform .1s}
+.yTile:active{transform:scale(.96)}
+.yTile.cur{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+.statusBar{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--muted);font-weight:600;padding:2px}
+.refresh{width:32px;height:32px;border:1px solid var(--line2);background:rgba(255,255,255,.04);border-radius:10px;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+.refresh:active{transform:scale(.88)}
+.refresh.spin svg{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:2px 6px}
+.lg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:600}
+.lg i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.sheet{position:fixed;inset:0;z-index:25;display:none;align-items:flex-end;justify-content:center}
+.sheet.on{display:flex}
+.sheet .bg{position:absolute;inset:0;background:rgba(4,7,15,.6);backdrop-filter:blur(4px)}
+.sheet .panel{position:relative;width:100%;max-width:560px;max-height:78dvh;overflow:auto;background:var(--cardSolid);border:1px solid var(--line2);border-radius:26px 26px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,.6);animation:rise .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes rise{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.grip{width:42px;height:5px;border-radius:3px;background:var(--line2);margin:0 auto 14px}
+.sheet h3{margin:0 0 2px;font-size:19px}
+.sheet .dsub{color:var(--muted);font-size:13px;margin-bottom:14px;font-weight:600}
+.evRow{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:16px;margin-bottom:9px;background:rgba(255,255,255,.025)}
+.evRow .bar{width:5px;align-self:stretch;border-radius:4px}
+.evRow .n{font-weight:800;font-size:15px}
+.evRow .tm{color:var(--muted);font-size:13px;font-weight:600;margin-top:2px}
+.empty{color:var(--faint);text-align:center;padding:24px 0;font-size:14px}
+.modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(4,7,15,.66);backdrop-filter:blur(6px)}
+.modal.on{display:flex}
+.modal .card{width:min(460px,100%);max-height:90dvh;overflow:auto;background:var(--cardSolid);border:1px solid var(--line2);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
+.modal h2{margin:0 0 6px;font-size:21px}
+.modal p{margin:0 0 4px;color:var(--muted);font-size:13.5px;line-height:1.4}
+.label{font-size:12.5px;font-weight:800;margin:14px 0 6px;color:var(--text)}
+.input{width:100%;border:1px solid var(--line2);background:rgba(255,255,255,.05);border-radius:13px;padding:13px 14px;outline:none;letter-spacing:2px}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--glow)}
+.warn{background:rgba(255,206,79,.1);border:1px solid rgba(255,206,79,.3);color:#ffd97a;border-radius:13px;padding:12px;font-size:12.5px;line-height:1.4;margin:14px 0}
+.btn{width:100%;border:0;border-radius:15px;padding:15px;font-weight:800;font-size:15px;margin-top:12px}
+.primary{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 10px 26px var(--glow)}
+.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:rgba(18,24,40,.97);border:1px solid var(--line2);color:#fff;border-radius:14px;padding:12px 18px;z-index:40;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;max-width:90%;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:380px){.title{font-size:21px}.chip{font-size:9px}.yearGrid{grid-template-columns:repeat(2,1fr)}.decGrid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<section class="screen">
+  <div class="top glass">
+    <div class="titleRow">
+      <div><div id="title" class="title">Calendrier</div><div id="subtitle" class="subtitle"></div></div>
+      <div class="nav">
+        <button class="iconBtn" id="prev">‹</button>
+        <button class="iconBtn" id="today">•</button>
+        <button class="iconBtn" id="next">›</button>
+        <button class="iconBtn" id="settingsBtn" title="Paramètres">⚙</button>
+      </div>
+    </div>
+    <div class="searchWrap">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="search" class="search" type="text" inputmode="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Rechercher une date…">
+    </div>
+    <div class="seg">
+      <button data-view="month" class="on">Mois</button>
+      <button data-view="year">Année</button>
+      <button data-view="decade">Décennie</button>
+    </div>
+  </div>
+  <div id="calendar" class="calendar glass"></div>
+  <div class="legend">
+    <span class="lg"><i style="background:var(--nuit)"></i>Nuit</span>
+    <span class="lg"><i style="background:var(--vacances)"></i>Vacances</span>
+    <span class="lg"><i style="background:var(--ferie)"></i>Férié</span>
+    <span class="lg"><i style="background:var(--conge)"></i>Congé</span>
+  </div>
+  <div class="statusBar">
+    <button id="refresh" class="refresh"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg></button>
+    <span id="status">Synchronisation…</span>
+  </div>
+</section>
+
+<div id="sheet" class="sheet"><div class="bg" id="sheetBg"></div><div class="panel"><div class="grip"></div><h3 id="sheetTitle"></h3><div id="sheetSub" class="dsub"></div><div id="sheetBody"></div></div></div>
+
+<div id="setup" class="modal"><div class="card">
+  <h2>Configuration</h2>
+  <p>Configure ton lien ICS Kronos pour synchroniser ton horaire personnel.</p>
+  <div class="label">Lien Kronos personnel (ICS)</div>
+  <input id="icsUrl" class="input" type="url" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://….mykronos.com/api/calendar_sync/…" style="letter-spacing:0">
+  <div class="hint" style="margin-top:8px;font-size:13px;opacity:.78;line-height:1.35;">Colle le lien ICS de ton horaire Kronos. Par défaut aucun lien n’est enregistré : tu peux le saisir ici au premier lancement ou plus tard via le bouton ⚙.</div>
+  <button id="saveSetup" class="btn primary">Enregistrer</button>
+  <button id="closeSetup" class="btn" style="background:rgba(255,255,255,.08);color:var(--text);margin-top:8px;">Fermer</button>
+</div></div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app-logger.js"></script>
+<script src="vault-core.js"></script>
+<script src="commercial-core.js"></script>
+<script>
+const ICS_KEY='calendar_ics_url_v1';
+const CACHE_KEY='calendar_events_cache_v2';
+const STAMP_KEY='calendar_events_stamp_v2';
+const REFRESH_MS=15*60*1000;
+
+const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MSHORT=['janv','févr','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
+const WEEK=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const COLORS={nuit:'var(--nuit)',soir:'var(--soir)',jour:'var(--jour)',quart:'var(--quart)',vacances:'var(--vacances)',ferie:'var(--ferie)',conge:'var(--conge)',autre:'var(--autre)'};
+const MIN_YEAR=1990,MAX_YEAR=2100;
+
+let y=new Date().getFullYear(),m=new Date().getMonth(),view='month',events={},sel=null;
+const $=id=>document.getElementById(id);
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2300)}
+function pad(n){return String(n).padStart(2,'0')}
+function key(yy,mm,dd){return yy+'-'+pad(mm+1)+'-'+pad(dd)}
+function leap(yy){return yy%4===0&&(yy%100!==0||yy%400===0)}
+function dim(yy,mm){return[31,leap(yy)?29:28,31,30,31,30,31,31,30,31,30,31][mm]}
+function firstDow(yy,mm){return(new Date(yy,mm,1).getDay()+6)%7}
+
+/* ---------- ICS parsing (shared logic) ---------- */
+function unfold(t){return t.replace(/\r/g,'').replace(/\n[ \t]/g,'')}
+function getVal(line){return line.slice(line.indexOf(':')+1).trim()}
+function hhmm(d){return pad(d.getHours())+':'+pad(d.getMinutes())}
+function icsDate(v){var x=v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?(Z)?/);if(!x)return null;var Y=+x[1],Mo=+x[2]-1,D=+x[3],h=+(x[4]||0),mi=+(x[5]||0),s=+(x[6]||0);if(x[7]==='Z'||x[4]!=null)return new Date(Date.UTC(Y,Mo,D,h,mi,s));return new Date(Y,Mo,D,h,mi,s)}
+function classify(su,de){var s=(su||'')+' '+(de||'');if(/Quart/i.test(su)){if(/Nuit/i.test(s))return{t:'nuit',n:'Quart de nuit'};if(/Soir/i.test(s))return{t:'soir',n:'Quart de soir'};if(/Jour|Matin/i.test(s))return{t:'jour',n:'Quart de jour'};return{t:'quart',n:'Quart de travail'}}if(/Vac/i.test(s))return{t:'vacances',n:'Vacances usine'};if(/f[eé]ri[eé]/i.test(s))return{t:'ferie',n:'Férié reporté'};if(/Sans solde/i.test(s))return{t:'conge',n:'Congé sans solde'};if(/Cong[eé]/i.test(s))return{t:'conge',n:'Congé'};return{t:'autre',n:(su||'Événement').replace(/^LSE-\s*/,'').replace(/\s*\[\d+:\d+\]\s*$/,'').trim()||'Événement'}}
+function parseICS(text){var lines=unfold(text).split('\n'),cur=null,out={};function add(k,e){(out[k]||(out[k]=[])).push(e)}for(var i=0;i<lines.length;i++){var line=lines[i];if(line.indexOf('BEGIN:VEVENT')===0)cur={};else if(line.indexOf('END:VEVENT')===0&&cur){if(cur.start){var c=classify(cur.summary,cur.desc);var shift=(c.t==='nuit'||c.t==='soir'||c.t==='jour'||c.t==='quart');var ev={t:c.t,n:c.n};if(shift&&cur.start&&cur.end){ev.s=hhmm(cur.start);ev.e=hhmm(cur.end)}var count=cur.count||1;var base=new Date(cur.start.getFullYear(),cur.start.getMonth(),cur.start.getDate());for(var k=0;k<count;k++){var d=new Date(base.getFullYear(),base.getMonth(),base.getDate()+k);add(key(d.getFullYear(),d.getMonth(),d.getDate()),{t:ev.t,n:ev.n,s:ev.s,e:ev.e})}}cur=null}else if(cur){if(line.indexOf('DTSTART')===0)cur.start=icsDate(getVal(line));else if(line.indexOf('DTEND')===0)cur.end=icsDate(getVal(line));else if(line.indexOf('SUMMARY')===0)cur.summary=getVal(line);else if(line.indexOf('DESCRIPTION')===0)cur.desc=getVal(line);else if(line.indexOf('RRULE')===0){var mm=getVal(line).match(/COUNT=(\d+)/);if(mm)cur.count=+mm[1]}}}return out}
+
+/* ---------- live sync ---------- */
+function loadCache(){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(c&&typeof c==='object')return c}catch(e){}return null}
+function bootEvents(){events=loadCache()||{}}
+async function sync(manual){const r=$('refresh');r.classList.add('spin');
+  const url=getIcsUrl();
+  if(!url){
+    r.classList.remove('spin');
+    $('status').textContent='Lien Kronos non configuré';
+    if(manual)toast('Configure ton lien Kronos dans les paramètres');
+    return;
+  }
+  $('status').textContent='Synchronisation…';
+  try{const res=await fetch(url,{cache:'no-store',headers:{'Accept':'text/calendar'}});if(!res.ok)throw new Error('HTTP '+res.status);const txt=await res.text();const parsed=parseICS(txt);if(parsed&&Object.keys(parsed).length){events=parsed;localStorage.setItem(CACHE_KEY,JSON.stringify(parsed));localStorage.setItem(STAMP_KEY,String(Date.now()))}render();$('status').textContent='À jour · '+nowLabel();if(manual)toast('Horaire synchronisé')}catch(e){try{AppLogger&&AppLogger.error&&AppLogger.error('CALENDAR_SYNC_ERROR',e)}catch(_){}const st=localStorage.getItem(STAMP_KEY);$('status').textContent=st?('Hors ligne · maj '+stampLabel(+st)):'Hors ligne';if(manual)toast('Pas de connexion — horaire en cache')}finally{r.classList.remove('spin')}}
+function nowLabel(){const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
+function stampLabel(ts){const d=new Date(ts);return d.getDate()+' '+MSHORT[d.getMonth()]+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
+
+/* ---------- config Kronos ---------- */
+function getIcsUrl(){return (localStorage.getItem(ICS_KEY)||'').trim()}
+function setIcsUrl(u){localStorage.setItem(ICS_KEY,(u||'').trim())}
+function openSetup(){icsUrl.value=getIcsUrl();$('setup').classList.add('on')}
+function saveCfg(){setIcsUrl(icsUrl.value);$('setup').classList.remove('on');toast('Configuration enregistrée');if(getIcsUrl())sync(false);else{$('status').textContent='Lien Kronos non configuré'}}
+function closeSetup(){$('setup').classList.remove('on')}
+
+/* ---------- search dates ---------- */
+function searchDate(raw){const s=raw.trim().toLowerCase();if(!s)return false;
+  let mth=null;for(let i=0;i<MONTHS.length;i++){if(s.includes(MONTHS[i].toLowerCase())||s.includes(MSHORT[i])){mth=i;break}}
+  const nums=(s.match(/\d+/g)||[]).map(Number);
+  let iso=s.match(/^(\d{4})[\/\-.](\d{1,2})(?:[\/\-.](\d{1,2}))?$/);
+  if(iso){y=+iso[1];m=Math.min(11,Math.max(0,(+iso[2])-1));if(iso[3])sel=key(y,m,Math.min(dim(y,m),+iso[3]));view='month';return go()}
+  let dmy=s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?$/);
+  if(dmy){const dd=+dmy[1],mm=+dmy[2]-1;if(dmy[3]){let yy=+dmy[3];if(yy<100)yy+=2000;y=yy}m=Math.min(11,Math.max(0,mm));sel=key(y,m,Math.min(dim(y,m),dd));view='month';return go()}
+  if(mth!=null){m=mth;const yy=nums.find(n=>n>=1990&&n<=2100);if(yy)y=yy;const dd=nums.find(n=>n>=1&&n<=31);if(dd)sel=key(y,m,Math.min(dim(y,m),dd));view='month';return go()}
+  if(/^\d{8}$/.test(s)){y=+s.slice(0,4);m=Math.min(11,Math.max(0,(+s.slice(4,6))-1));sel=key(y,m,Math.min(dim(y,m),+s.slice(6,8)));view='month';return go()}
+  if(/^\d{4}$/.test(s)){const yy=+s;if(yy>=1990&&yy<=2100){y=yy;view='year';return go()}}
+  if(/^\d{1,2}$/.test(s)){const dd=+s;if(dd>=1&&dd<=31){sel=key(y,m,Math.min(dim(y,m),dd));view='month';return go()}}
+  return false}
+function go(){syncSeg();render();const e=$('search');e.value='';e.blur();if(sel)toast('→ '+humanDate(sel));return true}
+function humanDate(k){const p=k.split('-');return(+p[2])+' '+MONTHS[+p[1]-1].toLowerCase()+' '+p[0]}
+async function runSearch(){const v=$('search').value;if(!searchDate(v))toast('Date introuvable')}
+
+/* ---------- render ---------- */
+function setTitle(){if(view==='month'){$('title').textContent=MONTHS[m]+' '+y;$('subtitle').textContent='Vue mensuelle'}else if(view==='year'){$('title').textContent=String(y);$('subtitle').textContent='Vue annuelle'}else{const st=Math.floor(y/10)*10;$('title').textContent=st+' – '+(st+9);$('subtitle').textContent='Vue par décennie'}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function renderMonth(){setTitle();const today=new Date();const tk=key(today.getFullYear(),today.getMonth(),today.getDate());
+  let h='<div class="week">'+WEEK.map(d=>'<div>'+d+'</div>').join('')+'</div><div class="monthGrid">';
+  const first=firstDow(y,m),days=dim(y,m),pm=m===0?11:m-1,py=m===0?y-1:y,pdays=dim(py,pm);
+  for(let i=0;i<42;i++){let dd,yy=y,mm=m,out=false;
+    if(i<first){dd=pdays-first+i+1;yy=py;mm=pm;out=true}
+    else if(i>=first+days){dd=i-first-days+1;mm=m===11?0:m+1;yy=m===11?y+1:y;out=true}
+    else dd=i-first+1;
+    const k=key(yy,mm,dd),ev=events[k]||[];const isT=k===tk,isS=k===sel;
+    let chips='';
+    if(ev.length<=2){chips=ev.map(e=>'<span class="chip" style="background:'+COLORS[e.t]+'">'+esc(e.s?e.s+' '+e.n:e.n)+'</span>').join('')}
+    else{chips='<div class="dotRow">'+ev.slice(0,6).map(e=>'<span class="d" style="background:'+COLORS[e.t]+'"></span>').join('')+'</div><span class="more">'+ev.length+' évén.</span>'}
+    h+='<button class="day'+(out?' out':'')+(isT?' today':'')+(isS?' sel':'')+'" data-k="'+k+'" data-out="'+(out?1:0)+'" data-dd="'+dd+'" data-mm="'+mm+'" data-yy="'+yy+'"><span class="num">'+dd+'</span><span class="chips">'+chips+'</span></button>'}
+  h+='</div>';$('calendar').innerHTML=h;
+  document.querySelectorAll('.day').forEach(b=>b.onclick=()=>{if(+b.dataset.out){m=+b.dataset.mm;y=+b.dataset.yy;render()}else openDay(b.dataset.k)})}
+function renderYear(){setTitle();let h='<div class="yearGrid">';for(let mm=0;mm<12;mm++){let cnt={};for(let d=1;d<=dim(y,mm);d++){(events[key(y,mm,d)]||[]).forEach(e=>cnt[e.t]=(cnt[e.t]||0)+1)}const dots=Object.keys(cnt).map(t=>'<span class="d" style="background:'+COLORS[t]+'"></span>').join('');h+='<button class="mTile" data-m="'+mm+'"><b>'+MONTHS[mm]+'</b><div class="dotRow">'+dots+'</div></button>'}h+='</div>';$('calendar').innerHTML=h;document.querySelectorAll('.mTile').forEach(b=>b.onclick=()=>{m=+b.dataset.m;view='month';syncSeg();render()})}
+function renderDecade(){setTitle();const st=Math.floor(y/10)*10;let h='<div class="decGrid">';for(let yy=st-1;yy<=st+10;yy++){if(yy<MIN_YEAR||yy>MAX_YEAR)continue;h+='<button class="yTile'+(yy===new Date().getFullYear()?' cur':'')+'" data-y="'+yy+'">'+yy+'</button>'}h+='</div>';$('calendar').innerHTML=h;document.querySelectorAll('.yTile').forEach(b=>b.onclick=()=>{y=+b.dataset.y;view='year';syncSeg();render()})}
+function render(){if(y<MIN_YEAR)y=MIN_YEAR;if(y>MAX_YEAR)y=MAX_YEAR;if(view==='month')renderMonth();else if(view==='year')renderYear();else renderDecade()}
+function syncSeg(){document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.view===view))}
+
+/* ---------- day sheet ---------- */
+function openDay(k){const ev=events[k]||[];const p=k.split('-');$('sheetTitle').textContent=(+p[2])+' '+MONTHS[+p[1]-1];const d=new Date(+p[0],+p[1]-1,+p[2]);$('sheetSub').textContent=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'][d.getDay()]+' '+p[0];
+  $('sheetBody').innerHTML=ev.length?ev.map(e=>'<div class="evRow"><div class="bar" style="background:'+COLORS[e.t]+'"></div><div><div class="n">'+esc(e.n)+'</div>'+(e.s?'<div class="tm">'+e.s+' → '+e.e+'</div>':'<div class="tm">Toute la journée</div>')+'</div></div>').join(''):'<div class="empty">Aucun quart ce jour-là</div>';
+  $('sheet').classList.add('on')}
+$('sheetBg').onclick=()=>$('sheet').classList.remove('on');
+
+/* ---------- nav / events ---------- */
+$('prev').onclick=()=>{if(view==='decade')y-=10;else if(view==='year')y--;else{m--;if(m<0){m=11;y--}}render()};
+$('next').onclick=()=>{if(view==='decade')y+=10;else if(view==='year')y++;else{m++;if(m>11){m=0;y++}}render()};
+$('today').onclick=()=>{const d=new Date();y=d.getFullYear();m=d.getMonth();sel=key(y,m,d.getDate());view='month';syncSeg();render()};
+$('refresh').onclick=()=>sync(true);
+$('saveSetup').onclick=saveCfg;
+$('closeSetup').onclick=closeSetup;
+$('settingsBtn').onclick=()=>openSetup();
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{view=b.dataset.view;syncSeg();render()});
+$('search').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runSearch()}});
+
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){const st=+(localStorage.getItem(STAMP_KEY)||0);if(Date.now()-st>60000)sync(false)}});
+setInterval(()=>{if(!document.hidden)sync(false)},REFRESH_MS);
+
+window.addEventListener('load',()=>{bootEvents();if(!getIcsUrl())openSetup();render();sync(false);});
+try{document.title='Calendrier'}catch(e){}
+</script>
+<script src="camera-indicator.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"name":"zak-license-server","version":"1.0.0","type":"module","private":true,"scripts":{"start":"node server.js"},"dependencies":{"express":"^4.19.2","better-sqlite3":"^11.1.2","helmet":"^7.1.0","cors":"^2.8.5","nanoid":"^5.0.7"}}

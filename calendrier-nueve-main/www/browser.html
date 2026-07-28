@@ -1,0 +1,74 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Navigateur</title><style>
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:flex;flex-direction:column;background:#0b0d12;color:#eef2f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+.top{display:flex;gap:8px;align-items:center;padding:max(10px,env(safe-area-inset-top)) 10px 10px;background:#121722;border-bottom:1px solid rgba(255,255,255,.1)}
+button,input{border:0;border-radius:12px;padding:11px 12px;font:inherit;outline:none}
+.ghost{background:#262d3c;color:#fff;font-weight:700}
+.gold{background:#c9a24b;color:#1a1407;font-weight:800}
+#url{flex:1;min-width:0;background:#070a10;color:#fff;border:1px solid rgba(255,255,255,.14)}
+#frameWrap{flex:1;position:relative;background:#fff}
+#frame{width:100%;height:100%;border:0;background:#fff}
+.note{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;background:#0b0d12;color:#aab2c2}
+.note.on{display:flex}
+.note b{color:#e2c074}
+.banner{font-size:11.5px;color:#c9a24b;background:#0f131d;padding:5px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+</style></head><body>
+<div class="top">
+  <button class="ghost" onclick="back()">‹</button>
+  <input id="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Recherche ou adresse">
+  <button class="gold" onclick="go()">OK</button>
+</div>
+<div class="banner">Aperçu web · téléchargement vers le coffre disponible uniquement dans l'APK compilé</div>
+<div id="frameWrap">
+  <iframe id="frame" referrerpolicy="no-referrer"></iframe>
+  <div id="note" class="note">
+    <div>Ce site refuse l'affichage intégré (protection <b>X-Frame-Options</b>).</div>
+    <button class="gold" onclick="openSystem()">Ouvrir dans le navigateur du téléphone</button>
+    <button class="ghost" onclick="home()">Page d'accueil</button>
+  </div>
+</div>
+<script src="app-logger.js"></script>
+<script src="vault-core.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const HOME='https://lite.duckduckgo.com/lite/';
+const P=()=>(window.Capacitor&&window.Capacitor.Plugins)||{};
+let last=HOME;
+AppLogger?.event('MODULE_OPEN',{module:'browser.html'});
+
+function normalize(v){
+  v=(v||'').trim(); if(!v)return HOME;
+  if(/^https?:\/\//i.test(v))return v;
+  if(/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(v)&&!/\s/.test(v))return 'https://'+v;
+  return 'https://lite.duckduckgo.com/lite/?q='+encodeURIComponent(v);
+}
+function load(u){
+  last=u; $('url').value=u; $('note').classList.remove('on');
+  AppLogger?.nav(u,'browser load');
+  $('frame').src=u;
+  clearTimeout(window.__chk);
+  window.__chk=setTimeout(checkBlocked,2600);
+}
+function checkBlocked(){
+  // Si le site bloque le framing, le contenu reste inaccessible : on propose le repli système.
+  try{
+    const d=$('frame').contentDocument;
+    if(d&&d.body&&d.body.childNodes.length===0){ $('note').classList.add('on'); }
+  }catch(e){ /* cross-origin = chargé OK, on ne fait rien */ }
+}
+function go(){ load(normalize($('url').value)); }
+function home(){ load(HOME); }
+function back(){
+  try{ if(history.length>1 && $('frame').contentWindow){ $('frame').contentWindow.history.back(); return; } }catch(e){}
+  location.href='home.html';
+}
+function openSystem(){
+  try{ if(P().Browser&&P().Browser.open){ P().Browser.open({url:last}); return; } }catch(e){}
+  window.open(last,'_system')||window.open(last,'_blank');
+}
+$('url').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+$('frame').addEventListener('error',()=>$('note').classList.add('on'));
+load(HOME);
+</script>
+<script src="camera-indicator.js"></script>
+</body></html>

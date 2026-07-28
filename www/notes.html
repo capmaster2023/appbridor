@@ -1,0 +1,44 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notes privées</title><style>:root{--ink:#0b0d12;--panel:#161922;--line:rgba(255,255,255,.09);--paper:#ECEEF3;--mist:#8B93A4;--brass:#C9A24B;--brass-soft:#e2c074;--danger:#E0564B;--serif:Georgia,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;color:var(--paper);font-family:var(--sans);background:#0b0d12;background-image:radial-gradient(100% 60% at 14% -4%,rgba(86,102,170,.20),transparent 50%),radial-gradient(120% 70% at 96% 104%,rgba(201,162,75,.12),transparent 46%),linear-gradient(180deg,#161b27 0%,#0e1118 52%,#0b0d12 100%);background-attachment:fixed}
+.top{display:flex;gap:10px;align-items:center;padding:max(16px,env(safe-area-inset-top)) 16px 14px;background:rgba(14,16,20,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
+.top b{flex:1;font-family:var(--serif);font-weight:600;font-size:19px;letter-spacing:.01em;line-height:1.15}
+.top b span{color:var(--brass-soft);font-family:var(--sans);font-size:12px;font-weight:600}
+button,input,textarea{border:0;border-radius:13px;padding:12px 14px;font:inherit;outline:none}
+button{background:linear-gradient(165deg,var(--brass-soft),var(--brass));color:#1a1407;font-weight:800;transition:transform .08s ease,filter .12s}
+button:active{transform:scale(.97);filter:brightness(1.05)}
+.ghost{background:#262d3c;color:#dfe3ec;border:1px solid var(--line);font-weight:700}
+.danger{background:rgba(224,86,75,.16);color:#ffb3ad;border:1px solid rgba(224,86,75,.42);font-weight:700}
+.wrap{padding:16px;max-width:680px;margin:0 auto}
+#search,input#search{width:100%}
+.list{display:grid;gap:11px}
+.card{background:linear-gradient(180deg,#1a2030,#141926);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.row{display:flex;gap:9px;align-items:center}.row>*{min-width:0}
+input,textarea{width:100%;background:#0c0f18;color:#fff;border:1px solid var(--line);transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus{border-color:rgba(201,162,75,.55);box-shadow:0 0 0 3px rgba(201,162,75,.15)}
+input::placeholder,textarea::placeholder{color:#5d6478}
+textarea{min-height:160px;line-height:1.5;resize:vertical}
+.card input,.card textarea{margin-bottom:10px}
+.muted{color:var(--mist);font-size:12.5px;margin-top:6px;letter-spacing:.01em}
+.viewer{white-space:pre-wrap;line-height:1.5}
+.hidden{display:none}
+</style></head><body><div class="top"><button class="ghost" onclick="AppLogger?.nav('home.html','back button from notes.html');location.href='home.html'">‹</button><b>Notes privées · <span id="vaultLabel"></span></b><button id="addBtn">Ajouter</button></div><div class="wrap"><input id="search" placeholder="Recherche"><br><br><div id="editor" class="hidden card"><input id="title" placeholder="Titre / nom"><textarea id="body" placeholder="Contenu"></textarea><div class="row"><button id="saveBtn">Enregistrer</button><button class="ghost" onclick="hideEditor()">Annuler</button></div></div><input id="file" type="file"  multiple class="hidden"><div id="list" class="list"></div></div><script src="app-logger.js"></script><script src="vault-core.js"></script><script>
+const KIND='notes', DB=VaultCore.dbName(KIND), STORE='items'; let cache=[], editing=null;
+const $=id=>document.getElementById(id); AppLogger?.event('MODULE_OPEN',{module:'notes.html'}); $('vaultLabel').textContent=VaultCore.label();
+function db(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+const st=m=>db().then(d=>d.transaction(STORE,m).objectStore(STORE));
+const put=v=>st('readwrite').then(o=>new Promise((res,rej)=>{const q=o.put(v);q.onsuccess=res;q.onerror=()=>rej(q.error)}));
+const del=id=>st('readwrite').then(o=>new Promise((res,rej)=>{const q=o.delete(id);q.onsuccess=res;q.onerror=()=>rej(q.error)}));
+const all=()=>st('readonly').then(o=>new Promise((res,rej)=>{const q=o.getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}));
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+async function load(){cache=await all();render();}
+async function render(){const q=$('search').value.toLowerCase();const rows=[];for(const it of cache.sort((a,b)=>b.updated-a.updated)){let text='';try{text=it.textEnc?await VaultCore.decryptText(it.textEnc):''}catch(e){text='[illisible]'}if(q&&!((it.name||'').toLowerCase().includes(q)||text.toLowerCase().includes(q)))continue;rows.push(`<div class="card"><div class="row"><b style="flex:1">${esc(it.name||'Sans titre')}</b><button class="ghost" onclick="openItem('${it.id}')">Ouvrir</button><button class="danger" onclick="removeItem('${it.id}')">Supprimer</button></div><div class="muted">${new Date(it.updated).toLocaleString()} · chiffré AES-256-GCM</div></div>`);}$('list').innerHTML=rows.join('')||'<div class="muted">Vide</div>';}
+function showEditor(it){editing=it||null;$('editor').classList.remove('hidden');$('title').value=it?.name||'';$('body').value=it?it._text||'':'';}
+function hideEditor(){$('editor').classList.add('hidden');editing=null;}
+async function openItem(id){const it=cache.find(x=>x.id===id);if(!it)return;let text='';try{text=it.textEnc?await VaultCore.decryptText(it.textEnc):''}catch(e){text='Erreur déchiffrement'}showEditor(Object.assign(it,{_text:text}));}
+async function removeItem(id){if(confirm('Supprimer définitivement ?')){await del(id);await load();}}
+$('addBtn').onclick=()=>{ showEditor(null); };
+$('saveBtn').onclick=async()=>{const name=$('title').value.trim()||'Sans titre';const text=$('body').value||'';const textEnc=await VaultCore.encryptText(text);await put({id:editing?.id||Date.now()+'_'+Math.random().toString(36).slice(2),name,textEnc,updated:Date.now()});hideEditor();await load();};
+$('file').onchange=async e=>{for(const f of [...e.target.files]){const buf=await f.arrayBuffer();const enc=await VaultCore.encrypt(buf);await put({id:Date.now()+'_'+Math.random().toString(36).slice(2),name:f.name,type:f.type,size:f.size,binEnc:enc,updated:Date.now()});}e.target.value='';await load();};
+$('search').oninput=render;load();</script><script src="camera-indicator.js"></script>
+</body></html>

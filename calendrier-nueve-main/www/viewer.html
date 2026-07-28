@@ -1,0 +1,207 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Lecteur</title><style>
+*{box-sizing:border-box}
+body{margin:0;background:#080a10;color:#eef2f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;padding:max(10px,env(safe-area-inset-top)) 10px 10px;background:#121722;border-bottom:1px solid rgba(255,255,255,.1)}
+button,input{border:0;border-radius:12px;padding:11px 12px;font:inherit}
+.ghost{background:#262d3c;color:#fff}
+.gold{background:#c9a24b;color:#1a1407;font-weight:800}
+.title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
+.bar{display:flex;gap:8px;padding:8px;background:#0f131d;border-bottom:1px solid rgba(255,255,255,.08)}
+.bar input{flex:1;background:#070a10;color:#fff;border:1px solid rgba(255,255,255,.12)}
+#stage{flex:1;overflow:auto;position:relative;-webkit-overflow-scrolling:touch}
+.paper{min-height:100%;padding:18px;white-space:pre-wrap;line-height:1.55;font-size:16px;transform-origin:top left}
+.paper mark{background:#c9a24b;color:#111}
+.empty{padding:22px;color:#aab2c2}
+iframe,object{width:100%;height:100%;border:0;background:#fff}
+.dark iframe{filter:invert(.9) hue-rotate(180deg)}
+.meta{font-size:12px;color:#9aa3b5;padding:6px 10px;background:#0f131d}
+/* PDF */
+#pdfPages{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px}
+#pdfPages canvas{background:#fff;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.45);max-width:100%;height:auto}
+.dark #pdfPages canvas{filter:invert(.92) hue-rotate(180deg)}
+/* ZIP */
+.zipbar{display:flex;align-items:center;gap:8px;padding:10px 14px;color:#c9a24b;font-weight:800;font-size:13px}
+.zipctx{position:sticky;top:0;z-index:3;background:#0f131d;border-bottom:1px solid rgba(255,255,255,.08);padding:8px 10px;display:none}
+.zipctx.on{display:block}
+.ziprow{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ziprow .zname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.ziprow .zsize{font-size:11px;color:#7f8a9e;margin-right:4px}
+.ziprow button{padding:8px 11px;font-size:13px}
+/* image */
+.imgwrap{display:grid;place-items:center;min-height:100%;padding:12px}
+.imgwrap img{max-width:100%;height:auto;border-radius:8px}
+</style></head><body>
+<div class="top">
+  <button class="ghost" onclick="goBack()">‹</button>
+  <div id="title" class="title">Lecteur</div>
+  <button class="ghost" onclick="zoom(-.15)">−</button>
+  <button class="ghost" onclick="zoom(.15)">+</button>
+  <button class="gold" onclick="toggleDark()">Sombre</button>
+</div>
+<div class="bar"><input id="q" placeholder="Rechercher"><button class="ghost" onclick="findText()">OK</button></div>
+<div id="meta" class="meta"></div>
+<div id="zipctx" class="zipctx"><button class="ghost" onclick="backToZip()">‹ Retour à l'archive</button></div>
+<div id="stage"><div class="empty">Chargement…</div></div>
+
+<script src="app-logger.js"></script>
+<script src="vault-core.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script type="module">
+  import { Archive } from './vendor/libarchive/libarchive.js';
+  Archive.init({ workerUrl: './vendor/libarchive/worker-bundle.js' });
+  window.LibArchive = Archive;
+</script>
+<script>
+const $=id=>document.getElementById(id);
+const params=new URLSearchParams(location.search);
+const kind=params.get('kind')||'files', item=params.get('id'), STORE='items';
+let scale=1, text='', currentBuf=null;
+let pdfDoc=null, pdfScale=1.1;
+let zipEntries=null, inZip=false, zipLabel='archive';
+
+/* PDF.js worker local (self-contained dans l'APK) */
+try{ pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js'; }catch(_){}
+
+function db(){return new Promise((res,rej)=>{const r=indexedDB.open(VaultCore.dbName(kind),1);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'id'})}})}
+async function getItem(){const d=await db();return await new Promise((res,rej)=>{const q=d.transaction(STORE).objectStore(STORE).get(item);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+function ext(n){return (n.split('.').pop()||'').toLowerCase()}
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function mime(e){return {pdf:'application/pdf',txt:'text/plain',csv:'text/csv',json:'application/json',zip:'application/zip'}[e]||'application/octet-stream'}
+function goBack(){ if(inZip){backToZip();return;} history.back(); }
+
+async function load(){
+  try{
+    const it=await getItem();
+    if(!it){$('stage').innerHTML='<div class="empty">Fichier introuvable.</div>';return}
+    $('title').textContent=it.name||'Fichier';
+    const e=ext(it.name||'');
+    let buf = it.binEnc ? await VaultCore.decrypt(it.binEnc)
+            : it.textEnc ? new TextEncoder().encode(await VaultCore.decryptText(it.textEnc)).buffer
+            : new ArrayBuffer(0);
+    currentBuf=buf;
+    localStorage.setItem('reading_'+item,JSON.stringify({name:it.name,last:new Date().toISOString(),kind}));
+    $('meta').textContent=(it.size?Math.round(it.size/1024)+' Ko · ':'')+'AES-256-GCM · '+(e||'fichier');
+
+    if(['txt','csv','json','md','log','xml','html','js','css'].includes(e) || (it.textEnc && !it.binEnc)){ text=new TextDecoder().decode(buf); renderText(text); return; }
+    if(e==='pdf'){ return renderPDF(buf); }
+    if(e==='zip'){ return openZip(buf); }
+    if(['rar','7z','tar','gz','tgz','bz2','tbz','tbz2','xz','txz','cab','iso','lzh','lha','zst','tzst','cpio','ar'].includes(e)){ return openArchiveLA(buf,e); }
+    if(['png','jpg','jpeg','gif','webp','bmp','svg'].includes(e)){ return renderImage(buf,e); }
+    if(['doc','docx','ppt','pptx','xls','xlsx'].includes(e)){
+      const url=URL.createObjectURL(new Blob([buf],{type:mime(e)}));
+      $('stage').innerHTML='<object data="'+url+'"><div class="empty">Prévisualisation Office non supportée par la WebView pour '+e.toUpperCase()+'. Fichier déchiffré en mémoire. <br><br><button class="gold" onclick="dl(\''+esc(it.name)+'\')">Extraire le fichier</button></div></object>';
+      window.__last={name:it.name,buf}; return;
+    }
+    window.__last={name:it.name,buf};
+    $('stage').innerHTML='<div class="empty">Type binaire ouvert en mémoire.<br><br><button class="gold" onclick="dl(\''+esc(it.name)+'\')">Extraire le fichier</button></div>';
+  }catch(e){AppLogger?.error('VIEWER_ERROR',e);$('stage').innerHTML='<div class="empty">Erreur ouverture fichier.</div>'}
+}
+
+/* ---------- PDF ---------- */
+async function renderPDF(buf){
+  $('zipctx').classList.toggle('on',inZip);
+  $('stage').innerHTML='<div class="empty">Rendu PDF…</div>';
+  try{
+    const data=new Uint8Array(buf.slice(0));
+    pdfDoc=await pdfjsLib.getDocument({data,disableStream:true,disableAutoFetch:true,isEvalSupported:false}).promise;
+    await drawPdf();
+  }catch(err){AppLogger?.error('PDF_RENDER_ERROR',err);$('stage').innerHTML='<div class="empty">PDF illisible. '+esc(err&&err.message||'')+'</div>'}
+}
+async function drawPdf(){
+  if(!pdfDoc)return;
+  $('stage').innerHTML='<div id="pdfPages"></div>';
+  const host=$('pdfPages');
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const fit=Math.max(.5,Math.min(2,(host.clientWidth-24)/612));
+  const eff=pdfScale*fit;
+  for(let p=1;p<=pdfDoc.numPages;p++){
+    const page=await pdfDoc.getPage(p);
+    const vp=page.getViewport({scale:eff});
+    const c=document.createElement('canvas'),ctx=c.getContext('2d');
+    c.width=Math.floor(vp.width*dpr);c.height=Math.floor(vp.height*dpr);
+    c.style.width=vp.width+'px';
+    host.appendChild(c);
+    await page.render({canvasContext:ctx,viewport:vp,transform:dpr!==1?[dpr,0,0,dpr,0,0]:undefined}).promise;
+  }
+}
+
+/* ---------- ARCHIVES (ZIP via JSZip, RAR/7z/tar… via libarchive WASM) ---------- */
+function laReady(){return new Promise((res,rej)=>{let n=0;(function chk(){if(window.LibArchive)return res(window.LibArchive);if(n++>120)return rej(new Error('libarchive non chargé'));setTimeout(chk,50)})()})}
+
+async function openZip(buf){
+  $('stage').innerHTML='<div class="empty">Lecture de l\'archive…</div>';
+  try{
+    const zip=await JSZip.loadAsync(buf);
+    zipEntries=[];
+    zip.forEach((path,f)=>{ if(!f.dir) zipEntries.push({path,size:(f._data&&f._data.uncompressedSize)||0,get:()=>f.async('arraybuffer')}); });
+    zipEntries.sort((a,b)=>a.path.localeCompare(b.path));
+    renderZipList('ZIP');
+  }catch(err){AppLogger?.error('ZIP_ERROR',err);$('stage').innerHTML='<div class="empty">Archive ZIP illisible.</div>'}
+}
+async function openArchiveLA(buf,e){
+  $('stage').innerHTML='<div class="empty">Décompression '+e.toUpperCase()+'…</div>';
+  try{
+    const Archive=await laReady();
+    const archive=await Archive.open(new File([buf],'archive.'+e));
+    let enc=false; try{enc=await archive.hasEncryptedData();}catch(_){}
+    if(enc){$('stage').innerHTML='<div class="empty">Archive '+e.toUpperCase()+' protégée par mot de passe — non supportée ici.</div>';return}
+    const arr=await archive.getFilesArray();
+    zipEntries=arr.map(o=>{const cf=o.file;return {path:(o.path||'')+cf.name,size:cf.size||0,get:async()=>{const f=await cf.extract();return await f.arrayBuffer();}};});
+    zipEntries.sort((a,b)=>a.path.localeCompare(b.path));
+    renderZipList(e.toUpperCase());
+  }catch(err){AppLogger?.error('ARCHIVE_LA_ERROR',err);$('stage').innerHTML='<div class="empty">Archive '+e.toUpperCase()+' illisible. '+esc(err&&err.message||'')+'</div>'}
+}
+function renderZipList(label){
+  if(label)zipLabel=label;
+  inZip=false; $('zipctx').classList.remove('on');
+  if(!zipEntries||!zipEntries.length){$('stage').innerHTML='<div class="empty">Archive vide.</div>';return}
+  let h='<div class="zipbar">'+zipEntries.length+' fichier(s) · '+zipLabel+'</div>';
+  zipEntries.forEach((en,i)=>{
+    const sz=en.size?Math.round(en.size/1024)+' Ko':'';
+    h+='<div class="ziprow"><span class="zname">'+esc(en.path)+'</span><span class="zsize">'+sz+'</span>'
+      +'<button class="ghost" onclick="zipPreview('+i+')">Voir</button>'
+      +'<button class="gold" onclick="zipExtract('+i+')">Extraire</button></div>';
+  });
+  $('stage').innerHTML=h;
+}
+async function zipPreview(i){
+  const en=zipEntries[i], nm=en.path.split('/').pop(), e=ext(nm);
+  inZip=true; $('zipctx').classList.add('on'); $('title').textContent=nm;
+  $('stage').innerHTML='<div class="empty">Chargement…</div>';
+  const ab=await en.get();
+  if(e==='pdf')return renderPDF(ab);
+  if(['png','jpg','jpeg','gif','webp','bmp','svg'].includes(e))return renderImage(ab,e);
+  if(['txt','csv','json','md','log','xml','html','js','css'].includes(e)){text=new TextDecoder().decode(ab);renderText(text);return}
+  window.__last={name:nm,buf:ab};
+  $('stage').innerHTML='<div class="empty">'+esc(nm)+' — aperçu non disponible pour ce type.<br><br><button class="gold" onclick="dl(\''+esc(nm)+'\')">Extraire ce fichier</button></div>';
+}
+async function zipExtract(i){const en=zipEntries[i],nm=en.path.split('/').pop();const ab=await en.get();dlBuf(nm,ab);}
+function backToZip(){ pdfDoc=null; renderZipList(); }
+
+/* ---------- image ---------- */
+function renderImage(buf,e){
+  const mt=e==='svg'?'image/svg+xml':(e==='jpg'?'image/jpeg':'image/'+e);
+  const url=URL.createObjectURL(new Blob([buf],{type:mt}));
+  $('stage').innerHTML='<div class="imgwrap"><img src="'+url+'"></div>';
+}
+
+/* ---------- texte ---------- */
+function renderText(t){$('stage').innerHTML='<div id="paper" class="paper"></div>';$('paper').textContent=t||''}
+function findText(){const s=$('q').value.trim();if(!text||!s)return;const re=new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');$('stage').innerHTML='<div id="paper" class="paper">'+text.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(re,m=>'<mark>'+m+'</mark>')+'</div>';}
+
+/* ---------- extraction (sortie du coffre, choix utilisateur) ---------- */
+function dl(name){ if(window.__last)dlBuf(name||window.__last.name,window.__last.buf); }
+function dlBuf(name,buf){const url=URL.createObjectURL(new Blob([buf]));const a=document.createElement('a');a.href=url;a.download=name||'fichier';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},1500);}
+
+/* ---------- zoom / sombre ---------- */
+function zoom(d){
+  if(pdfDoc){pdfScale=Math.max(.5,Math.min(3,pdfScale+d));drawPdf();return;}
+  scale=Math.max(.5,Math.min(3,scale+d));const p=$('paper');if(p)p.style.transform='scale('+scale+')';
+}
+function toggleDark(){document.body.classList.toggle('dark')}
+
+load();
+</script>
+<script src="camera-indicator.js"></script>
+</body></html>

@@ -1,0 +1,9 @@
+Caméra native ajoutée dans scripts/apply_android_customizations.sh
+
+Modes:
+- back: Camera2 + MediaRecorder + son, sans notification foreground
+- front: Camera2 + MediaRecorder + son, sans notification foreground
+- dual: tentative native Camera2: arrière + frontale simultanées, puis fusion FFmpeg en une vidéo verticale (arrière en haut, frontale en bas)
+
+Important:
+Le mode dual dépend du support matériel Android pour ouvrir 2 caméras en même temps. Si Samsung/Android refuse, les logs indiqueront l'erreur native.

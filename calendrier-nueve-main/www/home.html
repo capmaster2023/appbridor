@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>Accueil</title>
+<style>
+  :root{
+    --ink:#0b0d12; --panel:#161922; --panel2:#1E222D; --line:rgba(255,255,255,.08);
+    --mist:#8B93A4; --paper:#ECEEF3; --brass:#C9A24B; --brass-soft:#e2c074; --danger:#E0564B;
+    --serif:Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:var(--sans);overflow:hidden;overscroll-behavior:none;
+    color:var(--paper);background:#0b0d12;
+    background-image:
+      radial-gradient(110% 70% at 16% -6%, rgba(86,102,170,.26), transparent 52%),
+      radial-gradient(120% 75% at 92% 110%, rgba(201,162,75,.16), transparent 48%),
+      linear-gradient(180deg,#1a2030 0%,#11141c 46%,#0b0d12 100%);}
+  button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  .hidden{display:none!important}
+  svg.gi{width:27px;height:27px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
+
+  /* Barre d'état */
+  .statusbar{display:flex;align-items:center;justify-content:space-between;
+    padding:max(10px,env(safe-area-inset-top)) 20px 2px;font-size:12.5px;color:#cdd3df;letter-spacing:.03em}
+  .statusbar .right{display:flex;align-items:center;gap:7px;opacity:.85}
+  .statusbar .dot{width:3px;height:3px;border-radius:50%;background:#cdd3df;display:inline-block}
+
+  /* Bloc heure/date */
+  .clock{padding:30px 22px 14px;text-align:center}
+  .clock .eyebrow{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--brass);margin-bottom:12px}
+  .clock .t{font-size:clamp(58px,19vw,76px);font-weight:200;letter-spacing:.01em;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .clock .d{margin-top:8px;font-size:14px;color:var(--mist);text-transform:capitalize;letter-spacing:.02em}
+
+  /* Grille d'apps */
+  .apps{flex:1;overflow-y:auto;padding:14px 16px 14px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:22px 8px;align-content:start}
+  @media(max-width:340px){.apps{grid-template-columns:repeat(3,1fr)}}
+  .app{display:flex;flex-direction:column;align-items:center;gap:9px;background:none;
+    opacity:0;transform:translateY(12px);animation:rise .5s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .app:active{transform:scale(.9)}
+  .ic{width:60px;height:60px;border-radius:19px;display:grid;place-items:center;color:#fff;
+    box-shadow:0 12px 26px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.16);position:relative;overflow:hidden}
+  .ic::after{content:"";position:absolute;inset:0;border-radius:inherit;
+    background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 52%);pointer-events:none}
+  .ic.gal{background:linear-gradient(155deg,#caa24b,#8c6c25);color:#1c1606}
+  .ic.web{background:linear-gradient(155deg,#6d57d6,#33208a)}
+  .ic.set{background:linear-gradient(155deg,#465067,#272d3b)}
+  .ic.lock{background:linear-gradient(155deg,#2f9b63,#15663b)}
+  .ic.cam{background:linear-gradient(155deg,#3c6fa3,#1c3551)}
+  .ic.log{background:linear-gradient(155deg,#d2645c,#7e2e2a)}
+  .ic.note{background:linear-gradient(155deg,#4aa0b8,#1f5e72)}
+  .ic.file{background:linear-gradient(155deg,#c98a4b,#7e4f1e);color:#1c1606}
+  .ic.pdf{background:linear-gradient(155deg,#5b6172,#30353f)}
+  .lbl{font-size:12px;color:#dfe3ec;max-width:74px;text-align:center;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.01em}
+
+  /* Dock */
+  .dock{margin:0 14px max(16px,env(safe-area-inset-bottom));padding:14px 12px;border-radius:28px;
+    background:rgba(20,24,33,.62);border:1px solid var(--line);backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px rgba(0,0,0,.4);
+    display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .dock .app{animation:none;opacity:1;transform:none}
+  .dock .ic{width:54px;height:54px;border-radius:17px}
+  .dock svg.gi{width:25px;height:25px}
+
+  /* Modales */
+  .modal{position:fixed;inset:0;background:rgba(6,8,13,.78);display:none;align-items:center;
+    justify-content:center;z-index:50;padding:18px;backdrop-filter:blur(6px)}
+  .modal.on{display:flex}
+  .card{width:min(440px,100%);background:linear-gradient(180deg,#1a2030,#141926);
+    border:1px solid var(--line);border-radius:26px;padding:24px;color:var(--paper);
+    box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .card h2{margin:0 0 8px;font-family:var(--serif);font-size:24px;font-weight:600}
+  .card p{color:var(--mist);line-height:1.45;font-size:14px;margin:0 0 4px}
+  .card p b{color:var(--brass-soft)}
+  .input{width:100%;border:1px solid var(--line);background:#0c0f18;color:var(--paper);
+    border-radius:16px;padding:15px;font-size:17px;margin:10px 0 0;outline:none;transition:border-color .15s,box-shadow .15s}
+  .input:focus{border-color:rgba(201,162,75,.6);box-shadow:0 0 0 3px rgba(201,162,75,.16)}
+  .btn{width:100%;border:0;border-radius:16px;padding:15px;font-size:16px;font-weight:800;margin-top:12px;
+    transition:transform .08s ease}
+  .btn:active{transform:scale(.985)}
+  .brass{background:linear-gradient(165deg,var(--brass-soft),var(--brass));color:#1a1407}
+  .ghost{background:#262b38;color:#dfe3ec;border:1px solid var(--line)}
+  .small{font-size:12.5px;color:#8b93a4;margin-top:12px;line-height:1.5;display:flex;align-items:center;gap:8px}
+  .small input{accent-color:var(--brass)}
+  .toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:rgba(20,24,34,.96);
+    color:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 18px;z-index:99;display:none;
+    max-width:90%;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.5)}
+  .toast.on{display:block}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-gal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5-8 8"/></symbol>
+  <symbol id="i-web" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.5 2.6 16.5 0 18M12 3c-2.6 2.5-2.6 16.5 0 18"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h1.4a1.3 1.3 0 0 1 0 2.6H9zM9 13v4M15 13h-2v4M13 15h1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.4h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0z" transform="translate(0 0)"/><path d="M8 9h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24"><path d="M3 12h3l2.5-6 4 14 3-9 1.6 3H21"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.4" r="1.3"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8.5a3 3 0 0 1 3-3h1.6l1.2-1.7h4.4l1.2 1.7H17a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z"/><circle cx="12" cy="12.5" r="3.4"/><path d="M17.2 8.8h.01" stroke-width="2.4"/></symbol>
+  <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><rect x="8" y="6" width="8" height="3.2" rx="1"/><path d="M8.5 13h0M12 13h0M15.5 13h0M8.5 17h0M12 17h0M15.5 17h0" stroke-width="2.6"/></symbol>
+</defs></svg>
+
+<div id="screen" style="position:fixed;inset:0;display:flex;flex-direction:column">
+  <div class="statusbar">
+    <div id="sbClock">--:--</div>
+    <div class="right"><span>Privé</span><span class="dot"></span><span>5G</span><span class="dot"></span><span>100%</span></div>
+  </div>
+
+  <div class="clock">
+    <div class="eyebrow">Espace privé</div>
+    <div class="t" id="bigClock">--:--</div>
+    <div class="d" id="bigDate">—</div>
+  </div>
+
+  <div class="apps">
+    <button class="app" data-app="gal"><div class="ic gal"><svg class="gi"><use href="#i-gal"/></svg></div><div class="lbl">Galerie</div></button>
+    <button class="app" data-app="web"><div class="ic web"><svg class="gi"><use href="#i-web"/></svg></div><div class="lbl">Navigateur</div></button>
+    <button class="app" data-app="set"><div class="ic set"><svg class="gi"><use href="#i-set"/></svg></div><div class="lbl">Réglages</div></button>
+    <button class="app" data-app="pdf"><div class="ic pdf"><svg class="gi"><use href="#i-pdf"/></svg></div><div class="lbl">PDF</div></button>
+    <button class="app" data-app="files"><div class="ic file"><svg class="gi"><use href="#i-file"/></svg></div><div class="lbl">Files</div></button>
+    <button class="app" data-app="notes"><div class="ic note"><svg class="gi"><use href="#i-note"/></svg></div><div class="lbl">Notes</div></button>
+    <button class="app" data-app="logs"><div class="ic log"><svg class="gi"><use href="#i-log"/></svg></div><div class="lbl">Logs</div></button>
+    <button class="app" data-app="archives"><div class="ic file"><svg class="gi"><use href="#i-file"/></svg></div><div class="lbl">Archives</div></button>
+    <button class="app" data-app="admin" id="adminApp" style="display:none"><div class="ic lock"><svg class="gi"><use href="#i-lock"/></svg></div><div class="lbl">Admin</div></button>
+    <button class="app" data-app="cam"><div class="ic cam"><svg class="gi"><use href="#i-cam"/></svg></div><div class="lbl">Caméra</div></button>
+    <button class="app" data-app="lock"><div class="ic lock"><svg class="gi"><use href="#i-lock"/></svg></div><div class="lbl">Verrouiller</div></button>
+  </div>
+
+  <div class="dock">
+    <button class="app" data-app="gal"><div class="ic gal"><svg class="gi"><use href="#i-gal"/></svg></div><div class="lbl">Galerie</div></button>
+    <button class="app" data-app="web"><div class="ic web"><svg class="gi"><use href="#i-web"/></svg></div><div class="lbl">Navigateur</div></button>
+    <button class="app" data-app="cam"><div class="ic cam"><svg class="gi"><use href="#i-cam"/></svg></div><div class="lbl">Caméra</div></button>
+    <button class="app" data-app="lock"><div class="ic lock"><svg class="gi"><use href="#i-calc"/></svg></div><div class="lbl">Calculatrice</div></button>
+  </div>
+</div>
+
+<!-- Réglages : changer le code secret -->
+<div id="setModal" class="modal">
+  <div class="card">
+    <h2>Réglages — <span id="vaultName">Coffre</span></h2>
+    <p>Nouveau calcul d'ouverture. Exemple : <b>7×13+42÷6−5×8+91</b></p>
+    <input id="newCalc" class="input" placeholder="Nouveau calcul secret" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="saveCode" class="btn brass">Enregistrer le nouveau code</button>
+    <button id="closeSet" class="btn ghost">Annuler</button>
+    <label class="small"><input type="checkbox" id="antiShot"> Anti capture d'écran</label>
+    <label class="small"><input type="checkbox" id="antiRec"> Anti enregistrement écran</label>
+    <div class="small" style="color:#6f7787">Chaque coffre garde ses propres paramètres.</div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app-logger.js"></script>
+<script src="vault-core.js"></script><script src="commercial-core.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const CFG_KEY='secret_gallery_calc_v2';
+const P=()=>(window.Capacitor&&window.Capacitor.Plugins)||{};
+function toast(t){$('toast').textContent=t;$('toast').classList.add('on');setTimeout(()=>$('toast').classList.remove('on'),2200)}
+
+/* ===== Auto-lock suspendable (section C, partagé avec galerie.html) ===== */
+window.__suspendLock=false;
+async function suspendLock(){ window.__suspendLock=true; AppLogger?.event('LOCK_SUSPEND',{reason:'open native activity'}); try{await P().LockControl?.suspend();}catch(e){AppLogger?.error('LOCK_SUSPEND_ERROR',e)}}
+async function resumeLock(){ window.__suspendLock=false; AppLogger?.event('LOCK_RESUME',{}); try{await P().LockControl?.resume();}catch(e){AppLogger?.error('LOCK_RESUME_ERROR',e)}}
+function lockNow(){ window.__suspendLock=false; AppLogger?.nav('index.html','lockNow user/manual'); try{P().LockControl?.resume();}catch(e){AppLogger?.error('LOCK_RESUME_ERROR_BEFORE_LOCK',e)} location.replace('index.html'); }
+function goInternal(to, reason){ window.__suspendLock=true; AppLogger?.event('LOCK_SUSPEND',{reason:'internal navigation '+to}); try{P().LockControl?.suspend();}catch(e){AppLogger?.error('LOCK_SUSPEND_INTERNAL_ERROR',e)} AppLogger?.nav(to,reason); location.href=to; }
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ if(!window.__suspendLock){AppLogger?.nav('index.html','visibilitychange hidden suspendLock=false'); location.replace('index.html');} else {AppLogger?.event('LOCK_SKIP',{reason:'visibilitychange hidden but suspended'});} }
+  else { window.__suspendLock=false; AppLogger?.event('VISIBLE_AGAIN',{}); try{P().LockControl?.resume();}catch(e){AppLogger?.error('LOCK_RESUME_VISIBLE_ERROR',e)} }
+});
+window.addEventListener('pagehide',(e)=>{ if(!window.__suspendLock){AppLogger?.nav('index.html','pagehide persisted='+!!e.persisted+' suspendLock=false'); location.replace('index.html');} else {AppLogger?.event('LOCK_SKIP',{reason:'pagehide but suspended',persisted:!!e.persisted});} });
+
+/* ===== Horloge ===== */
+function tick(){
+  const d=new Date();
+  const hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0');
+  $('bigClock').textContent=hh+':'+mm; $('sbClock').textContent=hh+':'+mm;
+  try{ $('bigDate').textContent=d.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'}); }
+  catch(_){ $('bigDate').textContent=d.toDateString(); }
+}
+tick(); setInterval(tick,15000);
+
+/* ===== Apps ===== */
+function openGallery(){ goInternal('galerie.html','home app galerie click'); }
+function openSettings(){ $('newCalc').value=''; $('vaultName').textContent=VaultCore.label(); const s=VaultCore.settings(); $('antiShot').checked=!!s.antiScreenshot; $('antiRec').checked=!!s.antiRecording; $('setModal').classList.add('on'); }
+function closeSettings(){ $('setModal').classList.remove('on'); }
+
+function norm(s){return (s||'').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/,/g,'.').replace(/\s+/g,'').trim()}
+function calcEval(s){ if(!/^[0-9+\-*/().%]+$/.test(s))throw 0; return Function('"use strict";return ('+s.replace(/%/g,'/100')+')')(); }
+$('saveCode').onclick=()=>{
+  const c=norm($('newCalc').value);
+  if(!c){toast('Entre un calcul');return}
+  try{calcEval(c)}catch(e){toast('Calcul invalide');return}
+  let cfg={}; try{cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'{}')||{};}catch(_){cfg={};}
+  if(VaultCore.current()==='secondary') cfg.secondaryCalc=c; else cfg.calc=c;
+  cfg.created = cfg.created || Date.now(); cfg.updated = Date.now();
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
+  let ok=false; try{const saved=JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); ok=!!(VaultCore.current()==='secondary'?saved.secondaryCalc:saved.calc);}catch(_){ok=false;}
+  if(!ok){toast('Échec de sauvegarde. Réessaie.');return;}
+  closeSettings(); toast('Nouveau code enregistré');
+};
+$('antiShot').onchange=$('antiRec').onchange=()=>{const s=VaultCore.settings();s.antiScreenshot=$('antiShot').checked;s.antiRecording=$('antiRec').checked;VaultCore.saveSettings(s);VaultCore.applySecure();toast('Réglage sauvegardé');};
+$('closeSet').onclick=closeSettings;
+document.addEventListener('DOMContentLoaded',()=>{try{document.querySelector('.statusbar .right span').textContent=VaultCore.label(); const cfg=JSON.parse(localStorage.getItem('secret_gallery_calc_v2')||'{}'); if(cfg.adminEnabled&&document.getElementById('adminApp')) document.getElementById('adminApp').style.display='flex';}catch(e){}});
+
+/* Navigateur intégré : ouvre BrowserActivity (WebView + DuckDuckGo + téléchargeur). */
+async function openBrowser(){
+  const V=P().Vault;
+  if(V&&V.openBrowser){
+    try{
+      await suspendLock();        // C : on ouvre une autre activité native -> ne pas verrouiller
+      await V.openBrowser({vault:VaultCore.current()});
+      return;
+    }catch(e){ await resumeLock(); /* repli ci-dessous */ }
+  }
+  // Hors APK compilé (aperçu web/PWA) : navigateur intégré de repli, sans téléchargement vers le coffre.
+  goInternal('browser.html','home app web fallback');
+}
+
+document.querySelectorAll('.app').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const a=b.dataset.app; AppLogger?.event('APP_CLICK',{app:a});
+    if(a==='gal')openGallery();
+    else if(a==='web')openBrowser();
+    else if(a==='set')openSettings();
+    else if(a==='pdf'){goInternal('pdf.html','home app pdf click');}
+    else if(a==='files'){goInternal('files.html','home app files click');}
+    else if(a==='notes'){goInternal('notes.html','home app notes click');}
+    else if(a==='logs'){goInternal('logs.html','home app logs click');}
+    else if(a==='archives'){goInternal('archives.html','home app archives click');}
+    else if(a==='admin'){goInternal('admin.html','home app admin click');}
+    else if(a==='cam'){goInternal('camera.html','home app camera click');}
+    else if(a==='lock')lockNow();
+  });
+});
+
+/* Animations d'entrée échelonnées */
+document.querySelectorAll('.apps .app').forEach((el,i)=>el.style.animationDelay=(i*45)+'ms');
+</script>
+<script src="camera-indicator.js"></script>
+</body>
+</html>

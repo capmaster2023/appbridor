@@ -1,0 +1,45 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Archives</title><style>:root{--line:rgba(255,255,255,.09);--paper:#ECEEF3;--mist:#8B93A4;--brass:#C9A24B;--brass-soft:#e2c074;--danger:#E0564B;--serif:Georgia,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;color:var(--paper);font-family:var(--sans);background:#0b0d12;background-image:radial-gradient(100% 60% at 14% -4%,rgba(86,102,170,.20),transparent 50%),radial-gradient(120% 70% at 96% 104%,rgba(201,162,75,.12),transparent 46%),linear-gradient(180deg,#161b27 0%,#0e1118 52%,#0b0d12 100%);background-attachment:fixed}
+.top{display:flex;gap:10px;align-items:center;padding:max(16px,env(safe-area-inset-top)) 16px 14px;background:rgba(14,16,20,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
+.top b{flex:1;font-family:var(--serif);font-weight:600;font-size:19px}
+.top b span{color:var(--brass-soft);font-family:var(--sans);font-size:12px;font-weight:600}
+button,input{border:0;border-radius:13px;padding:12px 14px;font:inherit;outline:none}
+button{background:linear-gradient(165deg,var(--brass-soft),var(--brass));color:#1a1407;font-weight:800;transition:transform .08s ease,filter .12s}
+button:active{transform:scale(.97);filter:brightness(1.05)}
+.ghost{background:#262d3c;color:#dfe3ec;border:1px solid var(--line);font-weight:700}
+.danger{background:rgba(224,86,75,.16);color:#ffb3ad;border:1px solid rgba(224,86,75,.42);font-weight:700}
+.wrap{padding:16px;max-width:680px;margin:0 auto}
+#search{width:100%}
+.list{display:grid;gap:11px}
+.card{background:linear-gradient(180deg,#1a2030,#141926);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.row{display:flex;gap:9px;align-items:center}.row>*{min-width:0}
+input{width:100%;background:#0c0f18;color:#fff;border:1px solid var(--line)}
+.muted{color:var(--mist);font-size:12.5px;margin-top:6px}
+.filePick{position:fixed;left:-2000px;top:-2000px;width:1px;height:1px;opacity:.01}
+.hidden{display:none}
+</style></head><body>
+<div class="top"><button class="ghost" onclick="AppLogger?.nav('home.html','back from archives.html');location.href='home.html'">‹</button><b>Archives · <span id="vaultLabel"></span></b><button id="addBtn">Ajouter</button></div>
+<div class="wrap"><input id="search" placeholder="Recherche"><br><br><div id="list" class="list"></div></div>
+<input id="file" type="file" multiple accept=".zip,.rar,.7z,.tar,.gz,.tgz,.bz2,.xz,.cab,.iso" class="filePick">
+<script src="app-logger.js"></script>
+<script src="vault-core.js"></script>
+<script>
+const KIND='archives', DB=VaultCore.dbName(KIND), STORE='items'; let cache=[];
+const $=id=>document.getElementById(id); AppLogger?.event('MODULE_OPEN',{module:'archives.html'}); $('vaultLabel').textContent=VaultCore.label();
+function db(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+const st=m=>db().then(d=>d.transaction(STORE,m).objectStore(STORE));
+const put=v=>st('readwrite').then(o=>new Promise((res,rej)=>{const q=o.put(v);q.onsuccess=res;q.onerror=()=>rej(q.error)}));
+const del=id=>st('readwrite').then(o=>new Promise((res,rej)=>{const q=o.delete(id);q.onsuccess=res;q.onerror=()=>rej(q.error)}));
+const all=()=>st('readonly').then(o=>new Promise((res,rej)=>{const q=o.getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}));
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+async function load(){cache=await all();render();}
+function render(){const q=$('search').value.toLowerCase();const rows=[];for(const it of cache.sort((a,b)=>b.updated-a.updated)){if(q&&!(it.name||'').toLowerCase().includes(q))continue;rows.push(`<div class="card"><div class="row"><b style="flex:1">${esc(it.name||'Archive')}</b><button class="ghost" onclick="openItem('${it.id}')">Ouvrir</button><button class="danger" onclick="removeItem('${it.id}')">Supprimer</button></div><div class="muted">${it.size?Math.round(it.size/1024)+' Ko · ':''}${new Date(it.updated).toLocaleString()} · archive chiffrée AES-256-GCM</div></div>`);}$('list').innerHTML=rows.join('')||'<div class="muted">Aucune archive. « Ajouter » pour importer un .zip, .rar, .7z, .tar…</div>';}
+function openItem(id){const it=cache.find(x=>x.id===id);if(!it)return;location.href='viewer.html?kind=archives&id='+encodeURIComponent(id);}
+async function removeItem(id){if(confirm('Supprimer définitivement ?')){await del(id);await load();}}
+$('addBtn').onclick=()=>{try{$('file').click();}catch(e){alert('Impossible d’ouvrir le sélecteur.');}};
+$('file').onchange=async e=>{const chosen=[...e.target.files];AppLogger?.event('ARCHIVE_PICK',{count:chosen.length});for(const f of chosen){const buf=await f.arrayBuffer();const enc=await VaultCore.encrypt(buf);await put({id:Date.now()+'_'+Math.random().toString(36).slice(2),name:f.name,type:f.type,size:f.size,binEnc:enc,updated:Date.now()});}e.target.value='';await load();};
+$('search').oninput=render;load();
+</script>
+<script src="camera-indicator.js"></script>
+</body></html>
